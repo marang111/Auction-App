@@ -1,39 +1,20 @@
-// Art&Auction.tsx (최종 수정)
-
-import React, { FC } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
+import React, { useState, useRef, useCallback } from "react"; 
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// ⭐️ React Navigation Hooks 추가
+import { useScrollToTop, useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import FilterGroup from "../screens/wish/FilterGroup";
+import DetailPage from "../Art&Auction/2_hot_trend/DetailPage";
+import { TrendItem } from "../Art&Auction/2_hot_trend/HotTrendData";
 import HotTrendCarousel from "../Art&Auction/HotTrendCarousel";
-import AuctionNavigator from "../Art&Auction/AuctionNavigator"; 
-import MarketDiscoveryGrid from "../Art&Auction/MarketDiscoveryGrid";
-import TargetCardSection from "../Art&Auction/TargetCardSection";
+import AuctionCalendar from "../Art&Auction/AuctionCalendar";
+
+import AuctionNavigator from "../Art&Auction/auctionaround/AuctionNavigator";
+import MarketDiscoveryGrid from "../Art&Auction/auctionaround/MarketDiscoveryGrid";
+import RecommendCardSection from "../Art&Auction/RecommendCardSection";
+import AuctionList from "../Art&Auction/AllAuctionList"; 
 
 const screenWidth = Dimensions.get('window').width;
-
-// =========================================================================
-// 추후 변환될 예정인 하위 컴포넌트들의 더미(Dummy) 정의
-// =========================================================================
-
-// Calendar 더미 컴포넌트
-const Calendar = () => (
-    <View style={artAuctionStyles.calendarContainer}>
-        <Text style={artAuctionStyles.calendarHeader}>🗓️ 주요 경매 일정</Text>
-        <Text style={artAuctionStyles.calendarDummyText}>[실제 캘린더 컴포넌트가 들어갈 위치]</Text>
-    </View>
-);
-
-// 일반 경매 작품 목록 더미
-const AuctionItemCard = () => (
-    <View style={artAuctionStyles.card}>
-        <Text style={artAuctionStyles.cardTitle}>일반 경매 작품</Text>
-        <Text style={artAuctionStyles.cardText}>작품명: 모나리자</Text>
-        <Text style={artAuctionStyles.cardText}>경매사: 소더비</Text>
-        <Text style={artAuctionStyles.cardText}>D-7</Text>
-    </View>
-);
-
 
 // =========================================================================
 // 메인 ArtAuctionScreen 컴포넌트
@@ -41,142 +22,131 @@ const AuctionItemCard = () => (
 
 function ArtAuctionScreen() {
     
-    // 이 메뉴의 필터는 AuctionNavigator에만 있다고 가정하고, TargetCardSection의 이동 함수만 정의합니다.
-    const handleViewAllTargets = () => {
-        console.log('Navigate to dedicated Targets Tab/Screen');
-        // router.push('/targets') 와 같이 전용 페이지로 이동하는 로직 추가
-    };
+    // 1. 상태 관리
+    const [currentScreen, setCurrentScreen] = useState<'home' | 'detail'>('home');
+    const [selectedItem, setSelectedItem] = useState<TrendItem | null>(null);
+    const [recommendationTriggerId, setRecommendationTriggerId] = useState<number | null>(null);
     
-    // AuctionNavigator에서 필터가 변경되었을 때 목록을 갱신하는 함수 (더미)
-    const handleFilterChange = (filterId: string) => {
-        console.log(`Auction Navigator Filter Selected: ${filterId}`);
+    // ⭐️ 추가: ScrollView Ref 및 Refresh Key
+    const scrollViewRef = useRef<ScrollView>(null);
+    const [refreshKey, setRefreshKey] = useState(0); 
+    const navigation = useNavigation(); // navigation 훅 사용
+
+    // ⭐️ 스크롤을 맨 위로 올리는 React Navigation 훅 적용
+    useScrollToTop(scrollViewRef); 
+
+    // ⭐️ 탭 재선택 시 새로고침 및 홈 화면 복귀 로직
+    useFocusEffect(
+        useCallback(() => {
+            const unsubscribe = navigation.addListener('tabPress', (e) => {
+                // 1. 새로고침 키를 업데이트하여 주요 컴포넌트 강제 재마운트/리프레시
+                setRefreshKey(prev => prev + 1);
+
+                // 2. 혹시 detail 화면에 있을 경우 home 화면으로 복귀
+                if (currentScreen !== 'home') {
+                    setCurrentScreen('home');
+                }
+                
+                // 3. (useScrollToTop이 처리하지만) 스크롤 위치를 맨 위로 올리는 코드를 여기에 추가할 수도 있음.
+                // scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            });
+
+            return unsubscribe;
+        }, [navigation, currentScreen]) // currentScreen 상태를 사용하여 탭 재선택 시 로직을 최신 상태로 유지
+    );
+
+    // 2. 핸들러 함수
+    const handleNavigateToDetail = (item: TrendItem) => {
+        setSelectedItem(item);
+        setCurrentScreen('detail');
+        setRecommendationTriggerId(null); 
     };
+    const handleDetailClose = (item: TrendItem) => {
+        setCurrentScreen('home'); 
+        setSelectedItem(null);
+        setRecommendationTriggerId(item.id); 
+    };
+    const handleViewAllTargets = () => { console.log('Navigate to dedicated Targets Tab/Screen'); };
+    const handleFilterChange = (filterId: string) => { console.log(`Auction Navigator Filter Selected: ${filterId}`); };
 
+
+    // 💡 3. 렌더링 로직 수정
     return (
-        <SafeAreaView style={safeAreaStyles.container}>
-            <ScrollView contentContainerStyle={safeAreaStyles.scrollViewContent}>
+        <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, display: currentScreen === 'home' ? 'flex' : 'none' }}>
+                <SafeAreaView style={safeAreaStyles.container}>
+                    <ScrollView 
+                        ref={scrollViewRef} // ⭐️ Ref 연결
+                        contentContainerStyle={safeAreaStyles.scrollViewContent}
+                        scrollIndicatorInsets={{ right: 1 }} 
+                    >
+                        {/* ⭐️ 1. 추천 정보 (key 변경 시 재마운트되어 데이터 리프레시 유도) ⭐️ */}
+                        <RecommendCardSection 
+                            key={`recommend-${refreshKey}`}
+                            onViewAllTargets={handleViewAllTargets} 
+                        />
 
-                {/* ⭐️ 1. 개인화 정보:  ⭐️ */}
-                <TargetCardSection onViewAllTargets={handleViewAllTargets} />
+                        {/* 2. 트렌드: Hot Trend Carousel (key 변경 시 재마운트) */}
+                        <HotTrendCarousel
+                            key={`trend-${refreshKey}`}
+                            onNavigateToDetail={handleNavigateToDetail}
+                            showRecommendationForId={recommendationTriggerId}
+                        />
 
-        {/* --- 이하부터는 전체 시장 정보 탐색 영역 --- */}
-                
-                {/* 2. 트렌드: Hot Trend Carousel */}
-                <HotTrendCarousel />
+                        {/* 3. 기본 탐색 도구: 경매 일정 캘린더 */}
+                        <AuctionCalendar />
 
-                {/* 3. 기본 탐색 도구: 경매 일정 캘린더 */}
-                <Calendar />
+                        {/* 4. 분류 도구: Auction Navigator */}
+                        <AuctionNavigator onFilterChange={handleFilterChange} />
+                        
+                        {/* 5. 작품 분류: MarketDiscoveryGrid */}
+                        <View style={{ paddingHorizontal: -20 }}> 
+                            <MarketDiscoveryGrid />
+                        </View>
 
-                {/* 4. 분류 도구: Auction Navigator (메인 필터링 버튼 그룹) */}
-                <AuctionNavigator onFilterChange={handleFilterChange} />
-                
-                {/* 5. 작품 분류: Market Discovery Grid */}
-                <MarketDiscoveryGrid />
+                        {/* 6. 전체 경매 작품 목록 */}
+                        <View style={{ paddingBottom: 0 }}>
+                            <Text style={artAuctionStyles.listHeader}>전체 경매 목록</Text>
+                            <AuctionList 
+                                key={`list-${refreshKey}`}
+                            /> 
+                        </View>
+                        
+                    </ScrollView>
+                </SafeAreaView>
+            </View>
 
-                {/* 6. 상세 필터/정렬 기준 (AuctionNavigator 선택 기준을 상세 조정) */}
-                <View style={{ marginBottom: 10 }}>
-                    <FilterGroup />
+
+            {currentScreen === 'detail' && selectedItem && (
+                <View style={[StyleSheet.absoluteFillObject, { zIndex: 10 }]}>
+                    <DetailPage
+                        item={selectedItem}
+                        onClose={handleDetailClose}
+                    />
                 </View>
-
-                {/* 7. 일반 경매 작품 목록 */}
-                <View style={{ marginBottom: 20 }}>
-                    <Text style={artAuctionStyles.listHeader}>전체 경매 목록</Text>
-                    <AuctionItemCard />
-                    <AuctionItemCard />
-                    {/* ... */}
-                </View>
-
-            </ScrollView>
-        </SafeAreaView>
+            )}
+        </View>
     );
 }
 
 export default ArtAuctionScreen;
 
-
-// =========================================================================
-// 스타일 정의 (기존 스타일 유지)
-// =========================================================================
-
 const safeAreaStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5', 
+        backgroundColor: "white", 
     },
     scrollViewContent: {
-        paddingHorizontal: 16, 
+        paddingHorizontal: 20, 
         paddingTop: 10,
-        paddingBottom: 40,
     },
 });
 
 const artAuctionStyles = StyleSheet.create({
     listHeader: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#333',
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#2D3748',
         marginBottom: 15,
-    },
-    
-    // --- Calendar Styles --- 
-    calendarContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 15,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 5,
-            },
-            android: {
-                elevation: 3,
-            }
-        })
-    },
-    calendarHeader: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 10,
-    },
-    calendarDummyText: {
-        color: '#999',
-        textAlign: 'center',
-        paddingVertical: 40,
-        borderWidth: 1,
-        borderColor: '#f0f0f0',
-        borderRadius: 8,
-        backgroundColor: '#fafafa',
-    },
-
-    // --- 더미카드 --- 
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 15,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    cardTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 8,
-        color: '#222',
-    },
-    cardText: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 4,
-    },
+    }
 });

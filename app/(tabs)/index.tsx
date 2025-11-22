@@ -1,5 +1,3 @@
-// index.tsx (수정된 전체 코드)
-
 import { useRouter } from 'expo-router'; // ⭐️ useRouter 임포트
 import React, { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from 'react-native';

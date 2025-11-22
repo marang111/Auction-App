@@ -1,109 +1,148 @@
-// HotTrendCarousel.tsx
+import React, { FC, useEffect, useState } from "react";
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
-import React, { FC } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FOCUS_ARTWORK_DATA, TREND_DATA, TrendItem } from './2_hot_trend/HotTrendData';
+
+import FocusArtworkCard from './2_hot_trend/1_HtMainCard';
+import HotTrendMaincard from './2_hot_trend/HotTrendMaincard';
+import HotTrendSubcard from './2_hot_trend/HotTrendSubcard';
+import RecommendedTargetComponent from './2_hot_trend/recommendtarget/RecommendedTargetComponent';
 
 const { width } = Dimensions.get('window');
 
-// -------------------------------------------------------------------------
-// 1. 데이터 정의 (임시)
-// -------------------------------------------------------------------------
-
-interface TrendItem {
-    id: number;
-    title: string;
-    description: string;
-    icon: string; // 이모지 사용
-    color: string;
+// 1. 부모로부터 받을 Props 정의 (변경 없음)
+interface HotTrendCarouselProps {
+    onNavigateToDetail: (item: TrendItem) => void; 
+    showRecommendationForId: number | null; 
 }
 
-const TREND_DATA: TrendItem[] = [
-    { id: 1, title: 'Hot Artist', description: 'Yayoi Kusama의 펌프킨 시리즈', icon: '🎨', color: '#ffb3ba' },
-    { id: 2, title: 'Top Auction', description: '홍콩 크리스티, 이번 주 5억 달러', icon: '💎', color: '#ffdfba' },
-    { id: 3, title: 'Rising Sector', description: '동남아시아 현대미술 급부상', icon: '📈', color: '#ffffba' },
-    { id: 4, title: 'High Interest', description: '김환기 작품 조회수 30% 증가', icon: '👀', color: '#bae1ff' },
-];
+const HotTrendCarousel: FC<HotTrendCarouselProps> = ({ 
+    onNavigateToDetail, 
+    showRecommendationForId 
+}) => {
+    
+    // 2. 상태 관리 (변경 없음)
+    const [activeRecommendationId, setActiveRecommendationId] = useState<number | null>(null);
+    const [lastClickedItemTitle, setLastClickedItemTitle] = useState('');
 
-const COLORS = {
-    TEXT_DARK: '#2D3748',
-    TEXT_MEDIUM: '#4A5568',
-};
+    // 3. 부모 Prop 변경 감지 (변경 없음)
+    useEffect(() => {
+        if (showRecommendationForId) {
+            if (showRecommendationForId !== activeRecommendationId) {
+                setActiveRecommendationId(showRecommendationForId);
+            } 
+            else {
+                setActiveRecommendationId(null);
+            }
+        }
+        else {
+             setActiveRecommendationId(null);
+        }
+    }, [showRecommendationForId]); 
+    
+
+    /**
+     * 💡 4. 카드 클릭 핸들러 (MainCard 전용)
+     */
+    const handleCardClick = (item: TrendItem) => {
+        console.log(`Requesting Navigation for MainCard: ${item.id}`);
+        
+        setLastClickedItemTitle(item.title); 
+
+        if (onNavigateToDetail) {
+            onNavigateToDetail(item);
+        } else {
+            console.warn("onNavigateToDetail prop is missing!");
+        }
+    };
+    
+
+    // 5. 카드 렌더링 함수 
+    const renderTrendCard = (item: TrendItem) => {
+        const isMainCard = item.type === 'auction_focus';
+        const CardComponent = isMainCard ? HotTrendMaincard : HotTrendSubcard;
+
+        // 💡 SubCard에만 { paddingHorizontal: 20 } 스타일을 적용합니다.
+        const subCardPaddingStyle = !isMainCard ? { paddingHorizontal: 20 } : {}; 
+        
+        // 💡 MainCard일 때는 handleCardClick을, SubCard일 때는 빈 함수를 전달합니다.
+        const clickHandler = isMainCard 
+            ? () => handleCardClick(item) 
+            : () => { console.log('SubCard clicked - no navigation.'); }; // SubCard 클릭 시 (아무것도 안 함)
+
+        return (
+            // View로 감싸고, SubCard일 때만 패딩 스타일을 적용
+            <View style={subCardPaddingStyle} key={`card-wrapper-${item.id}`}> 
+                <CardComponent 
+                    {...item}
+                    onCardClick={clickHandler} 
+                />
+            </View>
+        );
+    };
 
 
-// -------------------------------------------------------------------------
-// 2. 컴포넌트
-// -------------------------------------------------------------------------
+    // 6. 메인 렌더링 로직 
+    const renderTrendListWithRecommendation = () => {
+        const renderedItems = [];
+        const trendData = TREND_DATA;
 
-const HotTrendCard: FC<TrendItem> = ({ title, description, icon, color }) => (
-    <TouchableOpacity style={[hotStyles.card, { backgroundColor: color }]} activeOpacity={0.8}>
-        <Text style={hotStyles.cardIcon}>{icon}</Text>
-        <Text style={hotStyles.cardTitle}>{title}</Text>
-        <Text style={hotStyles.cardDescription}>{description}</Text>
-    </TouchableOpacity>
-);
+        for (let i = 0; i < trendData.length; i++) {
+            const item = trendData[i];
+            
+            renderedItems.push(renderTrendCard(item));
 
-const HotTrendCarousel: FC = () => {
+            if (item.id === activeRecommendationId) {
+                renderedItems.push(
+                    <RecommendedTargetComponent 
+                        key={`recommended-block-${item.id}`}
+                        relatedContentTitle={lastClickedItemTitle} 
+                    />
+                );
+            }
+        }
+        return renderedItems;
+    };
+
+
+    // 7. 렌더링 
+    const focusArtworkItem = FOCUS_ARTWORK_DATA[0];
+
     return (
         <View style={hotStyles.container}>
-            <Text style={hotStyles.header}>🔥 지금 가장 뜨거운 작품/경매</Text>
-            <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={hotStyles.carouselContent}
-            >
-                {TREND_DATA.map((item) => (
-                    <HotTrendCard key={item.id} {...item} />
-                ))}
-            </ScrollView>
+        {/* ✨ 1. 타이틀 텍스트를 카드 위에 별도로 배치 */}
+        {focusArtworkItem && (
+            <Text style={hotStyles.maincardTitle}>{focusArtworkItem.title}</Text>
+        )}
+
+        {/* 2. FocusArtworkCard 컴포넌트 배치 */}
+        {focusArtworkItem && (
+            <FocusArtworkCard {...focusArtworkItem} />
+        )}
+        
+        <View style={hotStyles.blockContent}> 
+            {renderTrendListWithRecommendation()} 
         </View>
+    </View>
     );
 };
 
 export default HotTrendCarousel;
 
-// -------------------------------------------------------------------------
-// 3. 스타일 정의
-// -------------------------------------------------------------------------
-
 const hotStyles = StyleSheet.create({
     container: {
         marginBottom: 20,
+        marginHorizontal: -20,   
+        // backgroundColor: COLORS.DIVIDER_LIGHT
     },
-    header: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.TEXT_DARK,
-        marginBottom: 10,
-        paddingHorizontal: 0, // ScrollView의 패딩을 사용
+    blockContent: {
+        // borderWidth: 2
+        // 카드를 세로로 쌓는 컨테이너
     },
-    carouselContent: {
-        paddingHorizontal: 0,
-    },
-    card: {
-        width: width * 0.7, // 화면 너비의 70%
-        borderRadius: 12,
-        padding: 15,
-        marginRight: 10,
-        justifyContent: 'space-between',
-        height: 120,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
-    },
-    cardIcon: {
-        fontSize: 24,
-        marginBottom: 4,
-    },
-    cardTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: COLORS.TEXT_DARK,
-    },
-    cardDescription: {
-        fontSize: 12,
-        color: COLORS.TEXT_MEDIUM,
-        marginTop: 4,
-    },
+    maincardTitle: {
+        fontSize: 19,
+        fontWeight: 800,
+        paddingHorizontal: 20,
+        marginBottom: 13,
+    }
 });
