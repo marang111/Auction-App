@@ -1,57 +1,134 @@
-import { useRouter } from 'expo-router'; // ⭐️ useRouter 임포트
-import React, { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from "react";
+import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
+import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useGuideContext } from '../../context/GuideContext';
+// ⭐️ [제거] GuideModal 컴포넌트 임포트 제거
+// import GuideModal from '../../components/guidemodal/GuideModal'; 
 
+import Footer from "../Home/10_Footer";
 import SearchBar from '../Home/1_SearchBar';
 import Homemaincard, { AuctionItem, DEFAULT_DATA, LivebidResponse } from '../Home/2_MainScrollCard';
 import AuctionStatusDisplay from "../Home/2_mainscrollcard/AuctionStatusDisplay";
-import MyPersonalHub from "../Home/3_MyPersonalHub";
+import MyPersonalHub from "../Home/3_MyPersonalHub"; 
 import Curation from '../Home/4_Curation';
 import MarketInsight from '../Home/5_MarketInsight';
 import Private from '../Home/6_Private';
 import News from "../Home/7_News";
-import Latest from "../Home/8_Latest";
+import Latest from "../Home/8_Latest"; 
 import Education from "../Home/9_Education";
-import NewsletterForm from "../Home/10_NewsletterForm";
-import Footer from "../Home/10_Footer";
 
 const Topperfo = () => <View style={styles.dataCardContent}><Text style={styles.secondaryText}>Top Performance (Dummy)</Text></View>;
 
+const { height: windowHeight } = Dimensions.get('window');
+
 interface HomeProps {
-  setActiveTab: (tab: 'home' | 'auction' | 'chart' | 'search' | 'alerts') => void;}
+  setActiveTab: (tab: 'home' | 'auction' | 'chart' | 'search' | 'alerts') => void;
+}
+
+interface TargetAreaState {
+    id: string; 
+    absoluteY: number;
+    height: number;
+}
+
+const TARGET_AREA_IDS = {
+    PERSONAL_HUB: 'personalHub',
+    LATEST: 'latest',
+};
 
 const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
   const insets = useSafeAreaInsets();
-  const router = useRouter(); // ⭐️ useRouter 훅 사용
+  const router = useRouter();
+  // isModalVisible이 필요 없으므로 setTargetAreas만 가져옵니다.
+  const { setTargetAreas } = useGuideContext(); 
+
+  const personalHubRef = useRef<View>(null); 
+  const latestRef = useRef<View>(null); 
+  const privateRef = useRef<View>(null); 
   
-  // ⭐️ Homemaincard에서 임포트한 데이터를 상태의 초기값으로 사용
+  const scrollY = useRef(0);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [refreshKey, setRefreshKey] = useState(0); 
+  const navigation = useNavigation();
+  
   const [allAuctionData, setAllAuctionData] = useState<AuctionItem[]>(DEFAULT_DATA);
   const [activeAuction, setActiveAuction] = useState<AuctionItem>(DEFAULT_DATA[0]);
 
+  useScrollToTop(scrollViewRef); 
 
-  // '차트' 탭으로 이동하는 핸들러 (기존 코드 유지)
+  const measureTargetArea = useCallback(() => {
+    const areas: TargetAreaState[] = [];
+    const targetRefs: { ref: React.RefObject<View>; id: string }[] = [
+      { ref: personalHubRef, id: TARGET_AREA_IDS.PERSONAL_HUB },
+      { ref: latestRef, id: TARGET_AREA_IDS.LATEST },
+    ];
+    
+    let measuredCount = 0;
+    
+    const activeRefs = targetRefs.filter(item => item.ref.current);
+    const totalRefs = activeRefs.length;
+
+    if (totalRefs === 0) {
+        setTargetAreas(null);
+        return;
+    }
+
+    const checkAndSet = () => {
+        measuredCount++;
+        if (measuredCount === totalRefs) {
+            setTargetAreas(areas.length > 0 ? areas : null);
+        }
+    };
+
+    activeRefs.forEach(({ ref, id }) => { 
+        ref.current?.measure((fx, fy, width, height, px, py) => {
+            areas.push({ id: id, absoluteY: py, height: height }); 
+            checkAndSet();
+        });
+    });
+  }, [setTargetAreas]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.current = event.nativeEvent.contentOffset.y; 
+    measureTargetArea(); 
+  }, [measureTargetArea]);
+
+
+  useFocusEffect(
+      useCallback(() => {
+          const unsubscribe = navigation.addListener('tabPress', (e) => {
+              setRefreshKey(prev => prev + 1);
+              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+          });
+
+          measureTargetArea(); 
+
+          return () => {
+             unsubscribe();
+             setTargetAreas(null);      
+          };
+      }, [navigation, setTargetAreas, measureTargetArea]) 
+  );
+
+
   const navigateToChart = useCallback(() => {
     if (setActiveTab) {
       setActiveTab('chart'); 
-      console.log("Navigating to Chart Tab for detailed market info.");
     }
   }, [setActiveTab]);
   
-  // ⭐️ SearchDetail 스크린으로 이동하는 핸들러 수정
   const navigateToSearchDetail = useCallback(() => {
     router.push('../Home/1_searchdetail/SearchDetail'); 
-    console.log("Navigating to Search Detail Page: '../Home/1_searchdetail/SearchDetail'");
   }, [router]);
 
-
-  // ⭐️ Homemaincard의 스크롤에 따라 활성화된 카드 정보를 업데이트합니다.
   const handleActiveCardChange = useCallback((auction: AuctionItem) => {
     const latestData = allAuctionData.find(item => item.id === auction.id) || auction;
     setActiveAuction(latestData);
   }, [allAuctionData]); 
 
-  // ⭐️ AuctionStatusDisplay에서 호출되어 Live Status를 업데이트합니다.
   const updateLiveStatus = useCallback((id: number, newStatus: LivebidResponse) => {
       setAllAuctionData(prevData => {
           const newData = prevData.map(item =>
@@ -69,26 +146,31 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
       });
   }, []); 
 
-  // 큐레이션 클릭 핸들러 
   const handleCurationClick = useCallback(() => {
     console.log("Curation Clicked - Placeholder.");
   }, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      
       <ScrollView
+        ref={scrollViewRef} 
         style={styles.scrollViewStyle}
         contentContainerStyle={{ paddingBottom: insets.bottom + 0 }}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16} 
+        onLayout={measureTargetArea} 
+        onMomentumScrollEnd={measureTargetArea} 
+        // ⭐️ scrollEnabled={!isModalVisible} 속성 제거됨
       >
         {/* 검색창 */}
-        <View>
-          {/* ⭐️ SearchBar에 페이지 이동 함수 전달 */}
+        <View key={`search-${refreshKey}`}>
           <SearchBar onFocusNavigate={navigateToSearchDetail} /> 
         </View>
 
-        {/* 홈 메인 카드 (Live Auction) */}
-        <View>
+        {/* 메인 카드 */}
+        <View key={`maincard-${refreshKey}`}>
           <Homemaincard 
               data={allAuctionData} 
               onActiveCardChange={handleActiveCardChange} 
@@ -97,7 +179,7 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
 
         {/* 현재 최고 입찰가 */}
         {activeAuction ? (
-            <View style={styles.maincardBackground}>
+            <View style={styles.maincardBackground} key={`status-${refreshKey}`}>
               <AuctionStatusDisplay
                   auction={activeAuction}
                   updateLiveStatus={updateLiveStatus}
@@ -105,12 +187,17 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
             </View>
         ) : null}
 
-        {/* 개인화 허브 */}
-        <MyPersonalHub 
-            userName="마랑님"
-            onPressChip={(id, title) => console.log(`Chip clicked: ${title}`)}
-            onPressWork={(workId) => console.log(`Work clicked: ${workId}`)}
-        />
+        {/* 개인화 허브 (MyPersonalHub) - ⭐️ 타겟 영역 1: personalHubRef */}
+        <View 
+            ref={personalHubRef} 
+            onLayout={measureTargetArea} 
+        >
+            <MyPersonalHub 
+                userName="마랑님"
+                onPressChip={(id, title) => console.log(`Chip clicked: ${title}`)}
+                onPressWork={(workId) => console.log(`Work clicked: ${workId}`)}
+            />
+        </View>
 
         {/* 큐레이션 */}
         <View style={styles.mainHeaderArea}>
@@ -123,10 +210,10 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
             <MarketInsight />
         </View>
 
-        {/* Private Sale */}
-        <View style={styles.privateContainer}>
+        {/* Private Sale  */}
+        <View style={styles.privateContainer}>   
           <Text style={styles.privateHeader}>Private Sale</Text>
-          <Private />
+          <Private />        
         </View>
 
         {/* 뉴스 칼럼*/}
@@ -134,9 +221,11 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
           <News />
         </View>
 
-        {/* 마지막 관련 콘텐츠 카드들 */}
+        {/* 마지막 관련 콘텐츠 카드들 (Latest) - ⭐️ 타겟 영역 2: latestRef */}
         <View style={styles.cardcontainer}>
-            <Latest />
+            <View ref={latestRef} onLayout={measureTargetArea}>
+                <Latest />
+            </View>
         </View>
         
         {/* 교육 콘텐츠 */}
@@ -148,6 +237,10 @@ const Home: React.FC<HomeProps> = ({ setActiveTab }) => {
           <Footer />
         </View>
       </ScrollView>
+
+      {/* ⭐️ [제거] GuideModal 렌더링 제거됨 */}
+      {/* <GuideModal /> */}
+
     </View>
   );
 }
@@ -158,6 +251,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  scrollViewStyle: {
+    // 필요한 스타일
   },
   cardcontainer: {
     marginBottom: 24,
@@ -181,7 +277,7 @@ const styles = StyleSheet.create({
 
   newsContainer: {
     paddingTop: 36,
-    backgroundColor: "",
+    backgroundColor: "transparent",
     marginBottom: 24,
   },
 
@@ -197,22 +293,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 15,
   },
-
-  headerWithButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pillButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20, 
-    backgroundColor: '#F0F0F0', 
-  },
-  pillButtonText: {
-    color: '#2C3E50', 
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  dataCardContent: {
+    padding: 20,
+  }
 });
+//정상

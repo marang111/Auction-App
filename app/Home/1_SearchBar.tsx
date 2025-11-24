@@ -1,6 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View, Text } from 'react-native'; 
-import { Ionicons } from '@expo/vector-icons'; 
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface SearchBarProps {
   placeholder?: string;
@@ -9,7 +9,7 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ 
-    placeholder = "무엇이든 검색하세요.", 
+    placeholder = "최근 업데이트 수정일: 25.11.23" , 
     onFocusNavigate // ⭐️ prop으로 받습니다.
 }) => {
   

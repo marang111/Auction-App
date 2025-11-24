@@ -1,19 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { FC, useRef, useState } from "react";
-import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
-import { COLORS } from '../../../styles/COLORS'; 
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useToast } from "../../../components/SwipeCardToast";
+import { COLORS } from '../../../styles/COLORS';
 import { AuctionItem } from "./compo/AuctionListData";
 import { SwipeActionView } from './compo/SwipeActionView';
 
-// 1. 감도 설정
-const ACTION_WIDTH = 60; 
+// 감도 설정
+const ACTION_WIDTH = 70; 
 const SWIPE_THRESHOLD = ACTION_WIDTH * 0.99; 
 
-// ⭐️ 스프링 효과 설정: 저장 성공 여부에 따라 적용
+// 스와이프 감도 증폭 계수 정의
+// 1.0 = 100% (손가락 움직임과 동일), 1.5 = 150% (50% 증폭)
+const SWIPE_SENSITIVITY_MULTIPLIER = 1.9; // ⭐️ 추천 값: 1.6 (60% 증폭)
+
+// 스프링 효과 설정: 저장 성공 여부에 따라 적용
 const SPRING_TENSION_BOUNCY = 50;    // 저장 실패/취소 시 복귀 (통통 튐)
-const SPRING_FRICTION_BOUNCY = 6;    
+const SPRING_FRICTION_BOUNCY = 7;    
 const SPRING_TENSION_SAVED = 140;   // 저장 성공 후 복귀 (안정적)
 const SPRING_FRICTION_SAVED = 14; 
 
@@ -30,6 +34,34 @@ export const AuctionItemCard: FC<Props> = ({ item }) => {
     const pan = useRef(new Animated.ValueXY()).current;
     const [isSaved, setIsSaved] = useState(false); 
     const swipeIconScale = useRef(new Animated.Value(1)).current; 
+    // ⭐️ [수정 핵심] onPanGestureEvent 함수 수정
+    const onPanGestureEvent = Animated.event(
+        [
+            {
+                nativeEvent: ({ translationX }: { translationX: number }) => {
+                    // 손가락의 translationX에 증폭 계수를 곱하여 pan.x에 반영
+                    pan.x.setValue(translationX * SWIPE_SENSITIVITY_MULTIPLIER); 
+                },
+            },
+        ],
+        { useNativeDriver: false }
+    );
+    // ⭐️ [수정 핵심] onHandlerStateChange 함수 수정
+    const onPanHandlerStateChange = (event: any) => {
+        if (event.nativeEvent.oldState === State.ACTIVE) {
+            const { velocityX } = event.nativeEvent;
+            
+            // ⭐️ 주의: pan.x._value는 이미 증폭된 값이므로 그대로 사용
+            const currentPanX = pan.x._value; 
+            
+            // 기존 로직 유지: 증폭된 값이 SWIPE_THRESHOLD를 넘으면 성공
+            if (currentPanX > SWIPE_THRESHOLD) { 
+                handleSaveToCollection();
+            } else { 
+                resetCardPosition(velocityX);
+            }
+        }
+    };
     const saveAnimationTrigger = useRef(new Animated.Value(0)).current; 
 
     const panStyle = {
@@ -88,8 +120,8 @@ export const AuctionItemCard: FC<Props> = ({ item }) => {
                 Animated.spring(swipeIconScale, {
                     toValue: 1, 
                     useNativeDriver: true, 
-                    tension: 430,
-                    friction: 100,
+                    tension: 100,
+                    friction: 20,
                 })
             ]).start(() => {
                  setIsSaved(true);
@@ -136,8 +168,6 @@ export const AuctionItemCard: FC<Props> = ({ item }) => {
 
     return (
         <View style={Styles.swipeWrapper}>
-            {/* ⭐️ 마감된 경매는 스와이프 액션 뷰를 렌더링하지 않거나, 다른 처리를 할 수 있지만, 여기서는 조건부 렌더링을 생략하고 
-            위의 onHandlerStateChange에서 스와이프를 막았습니다. */}
             <SwipeActionView 
                 pan={pan} 
                 ACTION_WIDTH={ACTION_WIDTH} 
@@ -148,8 +178,15 @@ export const AuctionItemCard: FC<Props> = ({ item }) => {
             <PanGestureHandler
                 onGestureEvent={onGestureEvent}
                 onHandlerStateChange={onHandlerStateChange}
-                activeOffsetX={[-10000, 1]} 
+
+                 // 가로로 20px 이상 움직여야 스와이프 시작
+                activeOffsetX={[-1, 1]}
+                // 세로로 100px 움직여도 스와이프 시작 안함 
+                activeOffsetY={[-100, 100]} 
+                // 세로로 5px 이내 움직이면 스와이프 실패
                 failOffsetY={[-5, 5]} 
+                // 터치 영역 확대
+                hitSlop={{ top: -10, bottom: -10, left: 0, right: 0 }} 
             >
                 <Animated.View 
                     style={[Styles.animatedCard, panStyle]}
@@ -375,3 +412,4 @@ const Styles = StyleSheet.create({
         color: COLORS.TEXT_LIGHT, 
     },
 });
+//정상

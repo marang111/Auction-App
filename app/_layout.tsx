@@ -3,37 +3,63 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Alert, View, StyleSheet } from 'react-native'; 
 
 import { ToastProvider } from './../components/SwipeCardToast'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FloatingGuideButton } from '../components/FloatingGuideButton';
+import { GuideProvider, useGuideContext } from '../context/GuideContext'; 
+import GuideModal from '../components/guidemodal/GuideModal'; 
+
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+function RootLayoutContent() {
+  const handleGuideButtonClick = () => {
+    Alert.alert("가이드", "가이드 페이지로 이동하거나 도움말을 보여줍니다."); 
+  };
   const colorScheme = useColorScheme();
 
+  const { isModalVisible } = useGuideContext(); 
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
+      
       <ToastProvider> 
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
-            {/* 1. 기본 탭 내비게이터 */}
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            
-            {/* 2. Modal 화면 */}
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            
-            {/* 3. SearchDetail 화면 */}
             <Stack.Screen 
               name="Home/1_searchdetail/SearchDetail" 
               options={{ headerShown: false }} 
             />
           </Stack>
+          
+          <FloatingGuideButton onPress={handleGuideButtonClick} />
+          <GuideModal /> 
+
           <StatusBar style="auto" />
         </ThemeProvider>
       </ToastProvider>
     </GestureHandlerRootView>
   );
 }
+
+export default function RootLayout() {
+  return (
+    <GuideProvider> 
+      <RootLayoutContent />
+    </GuideProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+    root: {
+        flex: 1,
+    },
+    // ⭐️ scrollBlocker 스타일 정의 제거
+});
+//정상
