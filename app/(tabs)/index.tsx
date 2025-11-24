@@ -1,6 +1,6 @@
+import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from "react";
-import { useFocusEffect, useNavigation, useScrollToTop } from '@react-navigation/native';
 import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGuideContext } from '../../context/GuideContext';
@@ -11,12 +11,12 @@ import Footer from "../Home/10_Footer";
 import SearchBar from '../Home/1_SearchBar';
 import Homemaincard, { AuctionItem, DEFAULT_DATA, LivebidResponse } from '../Home/2_MainScrollCard';
 import AuctionStatusDisplay from "../Home/2_mainscrollcard/AuctionStatusDisplay";
-import MyPersonalHub from "../Home/3_MyPersonalHub"; 
+import MyPersonalHub from "../Home/3_MyPersonalHub";
 import Curation from '../Home/4_Curation';
 import MarketInsight from '../Home/5_MarketInsight';
 import Private from '../Home/6_Private';
 import News from "../Home/7_News";
-import Latest from "../Home/8_Latest"; 
+import Latest from "../Home/8_Latest";
 import Education from "../Home/9_Education";
 
 const Topperfo = () => <View style={styles.dataCardContent}><Text style={styles.secondaryText}>Top Performance (Dummy)</Text></View>;

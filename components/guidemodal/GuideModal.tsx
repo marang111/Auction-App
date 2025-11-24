@@ -1,17 +1,17 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
-import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler'; 
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withTiming, 
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGuideContext } from '../../context/GuideContext';
 import { GUIDE_CONTENTS } from './GuideContentData';
-import GuideModalPage from './compo/GuideModalPage'; 
-import { Ionicons } from '@expo/vector-icons'; 
+import GuideModalPage from './compo/GuideModalPage';
 
 const { height: screenHeight } = Dimensions.get('window');
 const MODAL_HEIGHT_RATIO = 0.35; 

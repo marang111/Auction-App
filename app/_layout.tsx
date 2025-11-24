@@ -1,15 +1,15 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Alert, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Alert, View, StyleSheet } from 'react-native'; 
 
-import { ToastProvider } from './../components/SwipeCardToast'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FloatingGuideButton } from '../components/FloatingGuideButton';
-import { GuideProvider, useGuideContext } from '../context/GuideContext'; 
-import GuideModal from '../components/guidemodal/GuideModal'; 
+import GuideModal from '../components/guidemodal/GuideModal';
+import { GuideProvider, useGuideContext } from '../context/GuideContext';
+import { ToastProvider } from './../components/SwipeCardToast';
 
 
 export const unstable_settings = {
