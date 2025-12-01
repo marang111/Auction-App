@@ -48,14 +48,12 @@ const GuideModal: React.FC = () => {
   }, [setIsModalVisible, translateY, backdropOpacity]);
 
 
-  // ⭐️ [수정된 goToPage] 태그 메뉴에서만 호출되는 것을 가정하고, 히스토리에 현재 페이지를 추가
   const goToPage = useCallback((id: string) => {
-    // 현재 페이지를 히스토리에 추가
     setPageHistory(prev => [...prev, currentPageId]);
     setCurrentPageId(id);
   }, [currentPageId]);
 
-  // ⭐️ 뒤로가기 함수: 히스토리에서 이전 페이지로 복귀
+  // 뒤로가기 함수: 히스토리에서 이전 페이지로 복귀
   const goBack = useCallback(() => {
     if (pageHistory.length > 0) {
       const newHistory = [...pageHistory];
@@ -250,7 +248,6 @@ const styles = StyleSheet.create({
   controlButtonText: {
       color: '#666',
       fontWeight: 'bold',
-      marginLeft: 2, 
   },
   closeButton: {
     right: 20, 
@@ -258,19 +255,7 @@ const styles = StyleSheet.create({
   backButton: {
     left: 20, 
   },
-  // closeButton: {
-  //   backgroundColor: '#000000ff',
-  //   paddingVertical: 12,
-  //   paddingHorizontal: 30,
-  //   borderRadius: 25,8                                                                                                                 
-  //   marginTop: 'auto', 
-  //   marginBottom: 25,
-  // },
-  // closeButtonText: {
-  //   color: 'white',
-  //   fontSize: 16,
-  //   fontWeight: 'bold',
-  // },
 });
 
 export default GuideModal;
+//정상

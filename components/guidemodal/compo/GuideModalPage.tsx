@@ -1,42 +1,108 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // ⭐️ TouchableOpacity 추가
-import { GuideContent } from '../GuideContentData'; // ⭐️ [추가] GUIDE_CONTENTS 임포트
-// ⭐️ [추가] AllAuctionGuideContent 컴포넌트 임포트
-import AllAuctionGuideContent from './AllAuctionGuideContent';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, TextStyle } from 'react-native'; 
+import { GuideContent, PortfolioDetail, StyledTextSegment } from '../GuideContentData'; 
+import AllAuctionGuideContent from './AllAuctionGuideContent'; 
+import GuideButtonAnimationContent from './GuideButtonAnimationContent'; 
 
 
-interface GuidePageProps {
-  content: GuideContent;
-  guideId: string; // ⭐️ [추가] 어떤 가이드 ID인지 받도록 수정
-  goToPage: (id: string) => void; // ⭐️ [추가] 페이지 이동 함수
-}
+// -------------------------------------------------------------------------
+// 1. StyledTextRenderer 인라인 스타일
+// -------------------------------------------------------------------------
+const StyledTextRenderer: React.FC<{ segments: StyledTextSegment[] }> = ({ segments }) => {
+    return (
+        <Text style={styles.itemContent}>
+            {segments.map((segment, index) => {
+                const highlightStyle: TextStyle = segment.isHighlight ? styles.highlightedText : {};
+                
+                const textWithBreaks = segment.text.split('\n').map((line, lineIndex, array) => (
+                    <React.Fragment key={lineIndex}>
+                        {line}
+                        {lineIndex < array.length - 1 && '\n'}
+                    </React.Fragment>
+                ));
 
-// ⭐️ [신규 컴포넌트] 태그 목록 컴포넌트 정의
+                return (
+                    <Text key={index} style={highlightStyle}>
+                        {textWithBreaks}
+                    </Text>
+                );
+            })}
+        </Text>
+    );
+};
+
+
+// -------------------------------------------------------------------------
+// 2. NumberedListRenderer (번호 매기기 구조 스타일링 - 1., 2., 3. 형태)
+// -------------------------------------------------------------------------
+const NumberedListRenderer: React.FC<{ items: StyledTextSegment[][] }> = ({ items }) => {
+    if (!items || items.length === 0 || items.every(item => item.every(segment => !segment.text || segment.text.trim() === ""))) {
+        return <Text style={styles.itemContent}>- 내용 없음 -</Text>;
+    }
+
+    return (
+        <View style={styles.listContainer}>
+            {items.map((segments, index) => {
+                const itemNumber = index + 1;
+                
+                const isItemEmpty = segments.every(segment => !segment.text || segment.text.trim() === "");
+                if (isItemEmpty) return null;
+
+                return (
+                    <View key={index} style={styles.listItem}>
+                        <Text style={styles.listNumber}>{itemNumber}. </Text>
+                        
+                        <View style={styles.listContentWrapper}>
+                           <StyledTextRenderer segments={segments} />
+                        </View>
+                    </View>
+                );
+            })}
+        </View>
+    );
+};
+
+
+// -------------------------------------------------------------------------
+// 3. PortfolioItem 컴포넌트
+// -------------------------------------------------------------------------
+const PortfolioItem: React.FC<{ title: string; content: StyledTextSegment[][] }> = ({ title, content }) => {
+    const hasContent = content.some(item => item.some(segment => segment.text && segment.text.trim() !== ""));
+    if (!hasContent) {
+        return null;
+    }
+    
+    return (
+        <View style={styles.itemContainer}>
+            <Text style={styles.itemTitle}>{title}</Text>
+            <NumberedListRenderer items={content} /> 
+        </View>
+    );
+};
+
+
+// -------------------------------------------------------------------------
+// 4. TagMenu 컴포넌트 (유지)
+// -------------------------------------------------------------------------
 const TagMenu: React.FC<{ goToPage: (id: string) => void }> = ({ goToPage }) => {
-    // ⭐️ Art&Auction 화면의 주요 가이드 ID들을 나열
     const guideTags = [
-        // Home 화면 가이드 ID
+        { id: 'guide', label: '가이드 버튼' },
         { id: 'recommendCard', label: '추천 작품' },
         { id: 'hotTrend', label: 'Hot Trend' },
-        
-        // Art&Auction 화면 가이드 ID
-        { id: 'auctionCalendar', label: '경매 캘린더' },
         { id: 'allAuctionList', label: '전체 경매 목록' },
-        // ... 필요한 다른 가이드 ID 추가 (GuideContentData.ts 기준)
     ];
 
     return (
-        <View style={tagStyles.tagContainer}>
-            <Text style={tagStyles.tagHeader}>주요 가이드 살펴보기</Text>
-            <View style={tagStyles.tagWrapper}>
+        <View style={styles.tagContainer}>
+            <Text style={styles.tagHeader}>주요 가이드 살펴보기</Text>
+            <View style={styles.tagWrapper}>
                 {guideTags.map((tag) => (
                     <TouchableOpacity 
                         key={tag.id} 
-                        style={tagStyles.tagButton} 
+                        style={styles.tagButton} 
                         onPress={() => goToPage(tag.id)}
-                        activeOpacity={0.7}
                     >
-                        <Text style={tagStyles.tagText}>#{tag.label}</Text>
+                        <Text style={styles.tagText}>{tag.label}</Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -45,35 +111,65 @@ const TagMenu: React.FC<{ goToPage: (id: string) => void }> = ({ goToPage }) => 
 };
 
 
-// ⭐️ 개별 가이드 페이지 컴포넌트
+// -------------------------------------------------------------------------
+// 5. GuideModalPage 메인 컴포넌트
+// -------------------------------------------------------------------------
+interface GuidePageProps {
+  content: GuideContent;
+  guideId: string;
+  goToPage: (id: string) => void;
+}
+
 const GuideModalPage: React.FC<GuidePageProps> = ({ content, guideId, goToPage }) => {
     
-    // ⭐️ [핵심 분기 로직] ID가 allAuctionList일 경우 전용 컴포넌트를 사용
-    if (guideId === 'allAuctionList') {
-        return <AllAuctionGuideContent />;
-    }
+    const portfolioDetails = content.portfolioDetails;
 
-    // ⭐️ [핵심 수정] guideId가 'default'일 경우, 태그 메뉴를 포함하여 렌더링
-    if (guideId === 'default') {
-        return (
-            <View style={[styles.pageContainer, { paddingBottom: 80 }]}>
-                {/* ⭐️ [제거] GuideModal.tsx가 핸들러를 담당 */}
-                
-                <Text style={styles.title}>{content.title}</Text>
-                <Text style={styles.description}>{content.description}</Text>
-                
-                {/* ⭐️ 태그 메뉴 추가 */}
-                <TagMenu goToPage={goToPage} />
-            </View>
-        );
-    }
-
-    // 그 외 일반 가이드 콘텐츠
     return (
-        <View style={styles.pageContainer}>
-        <Text style={styles.title}>{content.title}</Text>
-        <View style={styles.divider} />
-        <Text style={styles.description}>{content.description}</Text>
+        <View 
+            style={styles.pageContainer}
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+        >
+            <Text style={styles.title}>{content.title}</Text>
+            
+            {/* 1. 기본 설명 */}
+            {content.description && (
+                <>
+                    <Text style={styles.description}>
+                        {content.description!.split('\n').map((line, index) => (
+                            <React.Fragment key={index}>
+                                {line}
+                                {index < content.description!.split('\n').length - 1 && '\n'}
+                            </React.Fragment>
+                        ))}
+                    </Text>
+                </>
+            )}
+
+            {/* 2. 애니메이션 데모 컴포넌트 (Guide) */}
+            {guideId === 'guide' && (
+                <GuideButtonAnimationContent content={content} />
+            )}
+            
+            {/* ⭐️ [핵심 수정 부분] 스와이프 데모 컴포넌트 (AllAuctionList) */}
+            {guideId === 'allAuctionList' && (
+                <AllAuctionGuideContent content={content} />
+            )}
+
+            {/* 3. 포트폴리오 상세 내용 (하이라이트/번호 매기기 적용) */}
+            {portfolioDetails && (
+                <View style={styles.detailsContainer}>
+                    <PortfolioItem title="기획 의도" content={portfolioDetails.planning} as any />
+                    <PortfolioItem title="디자인 전략" content={portfolioDetails.design} as any />
+                    <PortfolioItem title="기능 요소" content={portfolioDetails.technical} as any />
+                </View>
+            )}
+            
+            {/* 4. 태그 메뉴 */}
+            {guideId === 'default' && (
+                <TagMenu goToPage={goToPage} />
+            )}
+            
         </View>
     );
 };
@@ -81,8 +177,78 @@ const GuideModalPage: React.FC<GuidePageProps> = ({ content, guideId, goToPage }
 export default GuideModalPage;
 
 
-// ⭐️ [신규 스타일] 태그 메뉴 스타일 추가
-const tagStyles = StyleSheet.create({
+// -------------------------------------------------------------------------
+// 6. 스타일 정의
+// -------------------------------------------------------------------------
+const styles = StyleSheet.create({
+    pageContainer: {
+        width: '100%',
+        paddingTop: 10,
+    },
+    scrollContent: {
+        alignItems: 'center',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 10, 
+        textAlign: 'center',
+    },
+    description: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 20, 
+    },
+    
+    detailsContainer: {
+        width: '100%',
+        paddingTop: 10,
+    },
+    itemContainer: { 
+        borderRadius: 8,
+        padding: 12,
+    },
+    itemTitle: { 
+        fontSize: 17,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 5,
+    },
+    itemContent: { 
+        fontSize: 15,
+        color: '#4A5568',
+        lineHeight: 23,
+        textAlign: 'left',
+    },
+    
+    highlightedText: {
+        fontWeight: 'bold',
+        color: '#7ba64bff',
+    },
+    
+    listContainer: {
+        marginTop: 5,
+        paddingLeft: 5, 
+    },
+    listItem: {
+        flexDirection: 'row',
+        marginBottom: 8,
+    },
+    listNumber: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#a5a5a5ff',
+        marginRight: 5,
+        alignSelf: 'flex-start', 
+        lineHeight: 23,
+    },
+    listContentWrapper: {
+        flex: 1, 
+    },
+
     tagContainer: {
         width: '100%',
         marginTop: 20,
@@ -116,35 +282,3 @@ const tagStyles = StyleSheet.create({
         fontWeight: '600',
     }
 });
-
-
-const styles = StyleSheet.create({
-    pageContainer: {
-        width: '100%',
-        paddingTop: 10,
-        paddingBottom: 50, // 페이지네이션 공간 확보
-        alignItems: 'center',
-        paddingHorizontal: 20, // ⭐️ [수정] 기본 페이지에도 패딩 추가
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    divider: {
-        width: 60,
-        height: 4,
-        backgroundColor: '#ddd',
-        borderRadius: 2,
-        marginBottom: 15,
-    },
-    description: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 24,
-    }
-});
-//정상

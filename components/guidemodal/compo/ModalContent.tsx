@@ -12,7 +12,7 @@ interface ModalContentProps {
 const ModalContent: React.FC<ModalContentProps> = ({ content, handleClose, panHandlers }) => {
   return (
     <>
-      {/* ⭐️ PanHandlers가 적용되는 핸들러 영역 */}
+      {/* 핸들러 영역 */}
       <View style={styles.handleContainer} {...panHandlers}> 
           <View style={styles.handleBar} />
       </View>
@@ -60,10 +60,9 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: '#FF6347',
+    margin: 'auto',
     paddingVertical: 12,
     paddingHorizontal: 30,
-    borderRadius: 25,
-    marginTop: 'auto', 
     marginBottom: 20,
   },
   closeButtonText: {

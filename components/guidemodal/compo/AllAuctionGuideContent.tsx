@@ -1,174 +1,228 @@
-import React from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// AllAuctionGuideContent.tsx
 
-const { width: screenWidth } = Dimensions.get('window');
+import React, { useEffect, useRef, useCallback } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// ⭐️ Reanimated 관련 기능만 임포트
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    runOnJS,
+} from 'react-native-reanimated';
+import { GuideContent } from '../GuideContentData'; 
+import { Ionicons } from '@expo/vector-icons'; 
 
-// ⭐️ 스와이프 가능한 아이템 컴포넌트 (예시)
-const SwipeItem: React.FC<{ title: string; subtitle: string; color: string }> = ({ title, subtitle, color }) => {
-    return (
-        <View style={[styles.itemContainer, { backgroundColor: color }]}>
-            <View style={styles.swipeHintContainer}>
-                <Text style={styles.swipeHint}>⇦ Swipe to see more options</Text>
-            </View>
-            <Text style={styles.itemTitle}>{title}</Text>
-            <Text style={styles.itemSubtitle}>{subtitle}</Text>
+// -------------------------------------------------------------------------
+// ⭐️ ExampleAutoSwipeItemCard: 자동으로 오른쪽으로 스와이프되는 카드
+// -------------------------------------------------------------------------
+interface ExampleAutoSwipeItemCardProps {
+    item: { id: string; title: string; artist: string; timeLeft: string; };
+}
+
+const ExampleAutoSwipeItemCard: React.FC<ExampleAutoSwipeItemCardProps> = ({ item }) => {
+    const isLive = item.timeLeft === 'LIVE';
+    const translateX = useSharedValue(0); 
+    const isSaved = useSharedValue(false);
+    const animationLoopRef = useRef<NodeJS.Timeout | null>(null); 
+
+    const SWIPE_OFFSET = 70; // 카드를 오른쪽으로 70px 이동
+
+    const toggleSave = useCallback(() => {
+        isSaved.value = !isSaved.value;
+    }, []);
+
+    // ⭐️ 자동 스와이프 애니메이션
+    const startAutoSwipe = useCallback(() => {
+        animationLoopRef.current = setTimeout(() => {
+            // 오른쪽으로 스와이프 (액션 버튼 노출)
+            translateX.value = withTiming(SWIPE_OFFSET, { duration: 800 });
             
-            {/* ⭐️ 숨겨진 스와이프 옵션 영역 (시각적 예시) */}
-            <View style={styles.hiddenOptions}>
-                <TouchableOpacity style={styles.optionButton}>
-                    <Text style={styles.optionText}>관심 등록</Text>
+            // 잠시 후 다시 원위치
+            setTimeout(() => {
+                // 저장 상태 토글 (애니메이션 효과 시뮬레이션)
+                runOnJS(toggleSave)(); 
+                translateX.value = withTiming(0, { duration: 800 });
+                // 애니메이션이 완료된 후 다음 루프 시작
+                animationLoopRef.current = setTimeout(startAutoSwipe, 3000); // 3초 대기 후 다음 루프
+            }, 1500); // 1.5초 노출
+        }, 1000); // 초기 1초 대기
+    }, [translateX, SWIPE_OFFSET, toggleSave]);
+
+    useEffect(() => {
+        startAutoSwipe(); 
+        return () => {
+            if (animationLoopRef.current) {
+                clearTimeout(animationLoopRef.current); 
+            }
+        };
+    }, [startAutoSwipe]);
+
+    const animatedCardStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateX: translateX.value }],
+        };
+    });
+    
+    const animatedActionBgStyle = useAnimatedStyle(() => {
+        return {
+            backgroundColor: isSaved.value ? '#007AFF' : '#1D2A3A',
+        };
+    });
+
+    return (
+        <View style={styles.autoSwipeCardOuterContainer}>
+            {/* ⭐️ 스와이프 액션 배경 (왼쪽에 위치) */}
+            <Animated.View style={[styles.swipeActionBackground, animatedActionBgStyle, styles.swipeActionLeft]}>
+                <TouchableOpacity 
+                    onPress={() => runOnJS(toggleSave)()} 
+                    style={styles.actionButton}
+                    disabled={true} // 데모이므로 터치 비활성화
+                >
+                    <Ionicons 
+                        name={isSaved.value ? 'bookmark' : 'bookmark-outline'} 
+                        size={24} 
+                        color="white" 
+                    />
+                    <Text style={styles.actionText}>{isSaved.value ? '저장됨' : '보관'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.optionButton, { backgroundColor: '#FF8C00' }]}>
-                    <Text style={styles.optionText}>알림 설정</Text>
-                </TouchableOpacity>
-            </View>
+            </Animated.View>
+
+            {/* ⭐️ 실제 카드 내용 (애니메이션 적용) */}
+            <Animated.View style={[styles.cardContainerInner, animatedCardStyle]}>
+                {/* 왼쪽: 이미지 영역 시뮬레이션 */}
+                <View style={styles.thumbnailPlaceholder} />
+                
+                {/* 오른쪽: 작품 정보 (간소화) */}
+                <View style={styles.content}>
+                    <View style={[styles.badge, isLive ? styles.liveBadge : styles.ddayBadge]}>
+                        <Text style={styles.badgeText}>{item.timeLeft}</Text>
+                    </View>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardSubtitle}>{item.artist}</Text>
+                    <Text style={styles.priceText}>
+                        {isLive ? '현재가 ₩15,000만' : '추정가 ₩10,000만'}
+                    </Text>
+                </View>
+            </Animated.View>
         </View>
     );
 };
 
+// ⭐️ 더미 데이터
+const DUMMY_AUCTION_DATA = [
+    { id: '1', title: '청색의 변주', artist: '작가 A', timeLeft: 'LIVE' },
+];
 
-// ⭐️ '전체 경매 목록' 가이드 상세 내용 컴포넌트
-const AllAuctionGuideContent: React.FC = () => {
-  return (
-    <View style={styles.fullContent}>
-        
-        <Text style={styles.header}>작품 리스트 확인 및 관리</Text>
-        <Text style={styles.subDescription}>
-            목록의 작품들은 필터링과 정렬 기능을 지원하며, 각 리스트 아이템은 스와이프하여 빠르게 추가 액션을 취할 수 있습니다.
-        </Text>
-        
-        <View style={styles.listSection}>
-            <Text style={styles.sectionTitle}>➡️ 스와이프 기능 예시</Text>
-            <ScrollView 
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                pagingEnabled
-            >
-                {/* ⭐️ 스와이프 예시 아이템 (실제 리스트 구현 방식과 유사) */}
-                <SwipeItem 
-                    title="스와이프 작동 방식" 
-                    subtitle="아이템을 오른쪽에서 왼쪽으로 밀어보세요." 
-                    color="#f4f4f4"
-                />
-                <SwipeItem 
-                    title="추가 액션 확인" 
-                    subtitle="숨겨진 관심 등록, 알림 설정 버튼이 나타납니다." 
-                    color="#f4f4f4"
-                />
-            </ScrollView>
+
+// -------------------------------------------------------------------------
+// ⭐️ AllAuctionGuideContent 메인 컴포넌트 (Swipe Demo만 렌더링)
+// -------------------------------------------------------------------------
+const AllAuctionGuideContent: React.FC<{ content: GuideContent }> = () => {
+    return (
+        <View style={styles.listContainer}> 
+             <ExampleAutoSwipeItemCard item={DUMMY_AUCTION_DATA[0]} />
         </View>
-
-        <Text style={styles.footerNote}>
-            * 스와이프 기능은 Art&Auction 목록 화면에서 직접 사용 가능합니다.
-        </Text>
-
-    </View>
-  );
+    );
 };
 
 export default AllAuctionGuideContent;
 
+
 const styles = StyleSheet.create({
-    fullContent: {
-        paddingHorizontal: 20,
-        width: screenWidth,
-    },
-    header: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1D2A3A',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    subDescription: {
-        fontSize: 14,
-        color: '#6A6A6A',
-        textAlign: 'center',
-        lineHeight: 22,
-        marginBottom: 20,
-    },
-    listSection: {
+    listContainer: {
+        paddingVertical: 10,
         width: '100%',
-        marginBottom: 20,
+        alignItems: 'center',
     },
-    sectionTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 10,
-    },
-    // 스와이프 리스트 스타일
-    scrollContent: {
-        paddingVertical: 5,
-    },
-    itemContainer: {
-        width: screenWidth - 40, // 패딩 고려
-        height: 100,
-        borderRadius: 10,
-        padding: 15,
-        marginRight: 10,
+    autoSwipeCardOuterContainer: {
+        width: '95%', // 모달 너비에 맞게 조정
+        height: 80, 
+        marginVertical: 5,
+        borderRadius: 5,
+        overflow: 'hidden', 
+        backgroundColor: 'white',
+        position: 'relative', 
         borderWidth: 1,
-        borderColor: '#ddd',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
+        borderColor: '#eee',
     },
-    swipeHintContainer: {
+    swipeActionBackground: {
         position: 'absolute',
+        top: 0,
+        bottom: 0,
+        width: 70, 
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    swipeActionLeft: { 
+        left: 0,
+    },
+    actionButton: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 5,
+    },
+    actionText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: 'white',
+        marginTop: 2,
+    },
+    cardContainerInner: { 
+        flexDirection: 'row',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        backgroundColor: 'white', 
+        position: 'absolute',
+        top: 0,
         left: 0,
         right: 0,
-        top: 0,
         bottom: 0,
-        backgroundColor: 'rgba(255, 99, 71, 0.1)',
+    },
+    thumbnailPlaceholder: {
+        width: 60,
+        height: 60,
+        backgroundColor: '#ccc',
+        borderRadius: 3,
+        marginRight: 10,
+    },
+    content: {
+        flex: 1,
         justifyContent: 'center',
-        alignItems: 'center',
     },
-    swipeHint: {
-        fontSize: 16,
+    badge: {
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        borderRadius: 3,
+        alignSelf: 'flex-start',
+        marginBottom: 3,
+    },
+    liveBadge: {
+        backgroundColor: '#FF3B30',
+    },
+    ddayBadge: {
+        backgroundColor: '#DAA520',
+    },
+    badgeText: {
+        fontSize: 10,
         fontWeight: 'bold',
-        color: '#FF6347',
-    },
-    itemTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 5,
-        zIndex: 1,
-    },
-    itemSubtitle: {
-        fontSize: 14,
-        color: '#666',
-        zIndex: 1,
-    },
-    hiddenOptions: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        paddingLeft: 10,
-        backgroundColor: '#eee', // 배경색을 달리하여 숨겨진 옵션 예시
-        width: 150, // 예시 영역 크기
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        transform: [{ translateX: 150 }], // 기본적으로 숨김
-    },
-    optionButton: {
-        backgroundColor: '#778899',
-        padding: 8,
-        borderRadius: 5,
-        marginLeft: 5,
-    },
-    optionText: {
         color: 'white',
-        fontSize: 12,
     },
-    footerNote: {
+    cardTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1D2A3A',
+        marginBottom: 2,
+    },
+    cardSubtitle: {
         fontSize: 12,
-        color: '#999',
-        textAlign: 'center',
-        marginTop: 10,
-    }
+        color: '#6A6A6A',
+    },
+    priceText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#007AFF',
+        marginTop: 4,
+    },
+   
 });
 //정상

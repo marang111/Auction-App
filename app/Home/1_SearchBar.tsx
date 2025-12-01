@@ -9,7 +9,7 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ 
-    placeholder = "최근 업데이트 수정일: 25.11.24" , 
+    placeholder = "최근 업데이트 수정일: 25.12.01" , 
     onFocusNavigate // ⭐️ prop으로 받습니다.
 }) => {
   
